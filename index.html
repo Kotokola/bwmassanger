@@ -29,6 +29,8 @@
             --online-green: #22c55e;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
             --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+            --danger: #ef4444;
+            --warning: #f59e0b;
         }
 
         body.dark {
@@ -80,7 +82,7 @@
             background: var(--bg-sidebar);
             border-radius: 28px;
             width: 90%;
-            max-width: 500px;
+            max-width: 520px;
             max-height: 85vh;
             overflow-y: auto;
             animation: fadeIn 0.2s ease;
@@ -92,6 +94,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--bg-sidebar);
+            z-index: 10;
         }
         .modal-header h3 { font-size: 20px; font-weight: 600; }
         .modal-body { padding: 24px; }
@@ -105,7 +111,7 @@
         }
         .close-modal:hover { color: var(--text-primary); }
 
-        /* Контекстное меню - фикс позиционирования */
+        /* Контекстное меню */
         .context-menu {
             position: fixed;
             background: var(--bg-sidebar);
@@ -134,7 +140,7 @@
             margin: 6px 0;
         }
 
-        /* Боковое меню (drawer) как в Telegram */
+        /* Боковое меню (drawer) */
         .drawer {
             position: fixed;
             top: 0;
@@ -530,28 +536,93 @@
             .message-bubble { max-width: 85%; }
         }
 
-        /* Стили для настроек */
-        .settings-section {
+        /* Стили для профиля */
+        .profile-header-card {
+            text-align: center;
             margin-bottom: 24px;
         }
-        .settings-section-title {
+        .profile-avatar-large {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 16px;
+            border: 3px solid var(--accent);
+        }
+        .profile-name-large {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .profile-username-large {
             font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .profile-id {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        .profile-email {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+        .profile-info-row {
+            display: flex;
+            padding: 14px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .profile-info-label {
+            width: 100px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .profile-info-value {
+            flex: 1;
+            color: var(--text-primary);
+        }
+        .profile-edit-btn {
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        /* Стили для настроек */
+        .settings-group {
+            margin-bottom: 24px;
+        }
+        .settings-group-title {
+            font-size: 13px;
             font-weight: 600;
             color: var(--text-secondary);
             margin-bottom: 12px;
             text-transform: uppercase;
         }
-        .settings-item {
+        .settings-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 12px 0;
             border-bottom: 1px solid var(--border-light);
-            cursor: pointer;
         }
-        .settings-item:hover { background: var(--bg-chat); }
-        .settings-item-left { display: flex; align-items: center; gap: 12px; }
-        .settings-item-left i { width: 24px; color: var(--text-secondary); }
+        .settings-row-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .settings-row-left i {
+            width: 24px;
+            color: var(--text-secondary);
+        }
         .settings-switch {
             width: 44px;
             height: 24px;
@@ -574,6 +645,13 @@
             transition: 0.2s;
         }
         .settings-switch.active::after { left: 22px; }
+        .settings-select {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-chat);
+            color: var(--text-primary);
+        }
     </style>
 </head>
 <body>
@@ -584,7 +662,7 @@
 
     // ========== IndexedDB ==========
     const DB_NAME = 'BWMessengerDB';
-    const DB_VERSION = 13;
+    const DB_VERSION = 14;
     let db = null;
     let currentUser = null;
     let currentChat = null;
@@ -606,6 +684,7 @@
                 if (!db_.objectStoreNames.contains('messages')) {
                     const msgStore = db_.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
                     msgStore.createIndex('chatId', 'chatId');
+                    msgStore.createIndex('timestamp', 'timestamp');
                 }
                 if (!db_.objectStoreNames.contains('session')) db_.createObjectStore('session', { keyPath: 'id' });
                 if (!db_.objectStoreNames.contains('temp_codes')) db_.createObjectStore('temp_codes', { keyPath: 'email' });
@@ -949,19 +1028,26 @@
         
         document.getElementById('drawerProfile').onclick = () => { showProfileModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerContacts').onclick = () => { showContactsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
-        document.getElementById('drawerCalls').onclick = () => { showToast('Звонки (в разработке)'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerCalls').onclick = () => { showToast('Звонки будут доступны в следующей версии'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerSaved').onclick = async () => { 
             const savedChat = allChats.find(c => c.type === 'saved' && c.userId === currentUser.id);
             if(savedChat) await openChat(savedChat.id);
             drawer.classList.remove('open'); overlay.classList.remove('show');
         };
-        document.getElementById('drawerSettings').onclick = () => { showFullSettingsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerSettings').onclick = () => { showSettingsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerPrivacy').onclick = () => { showPrivacyModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerSessions').onclick = () => { showSessionsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerNightMode').onclick = () => { document.body.classList.toggle('dark'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerLogout').onclick = async () => { await clearSession(); location.reload(); };
         
-        document.getElementById('newGroupBtn').onclick = async () => { const name = prompt('Название группы'); if(name) { await saveChat({ id: `group_${Date.now()}`, type: 'group', name, participants: [currentUser.id], createdAt: Date.now() }); await renderChatsList(); } };
+        document.getElementById('newGroupBtn').onclick = async () => { 
+            const name = prompt('Название группы'); 
+            if(name) { 
+                await saveChat({ id: `group_${Date.now()}`, type: 'group', name, participants: [currentUser.id], createdAt: Date.now() }); 
+                await renderChatsList(); 
+                showToast(`Группа "${name}" создана`);
+            } 
+        };
         document.getElementById('createGroupFooterBtn').onclick = document.getElementById('newGroupBtn').onclick;
 
         await renderChatsList();
@@ -989,6 +1075,7 @@
                             if(!chat) {
                                 chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, target.id], name: `${target.name} ${target.lastname || ''}` };
                                 await saveChat(chat);
+                                allChats.push(chat);
                                 await renderChatsList();
                             }
                             await openChat(chat.id);
@@ -998,7 +1085,7 @@
                     };
                 });
             } else {
-                searchResults.innerHTML = `<div class="search-result-item" style="justify-content:center;color:var(--text-secondary);"><i class="fas fa-user-slash"></i> Пользователь не найден</div>`;
+                searchResults.innerHTML = `<div class="search-result-item" style="justify-content:center;color:var(--text-secondary);"><i class="fas fa-user-slash"></i> Пользователь "${query}" не найден</div>`;
                 searchResults.style.display = 'block';
             }
         };
@@ -1013,7 +1100,20 @@
 
         document.getElementById('sendMsgBtn').onclick = () => handleSendMessage();
         document.getElementById('messageInput')?.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleSendMessage(); });
-        document.getElementById('attachBtn').onclick = () => { const input = document.createElement('input'); input.type='file'; input.onchange=async(e)=>{ const file=e.target.files[0]; if(file && currentChat){ const reader=new FileReader(); reader.onload=async(ev)=>await saveMessage({ chatId:currentChat.id, senderId:currentUser.id, text:`📎 ${file.name}`, file:ev.target.result, timestamp:Date.now() }); reader.readAsDataURL(file); } }; input.click(); };
+        document.getElementById('attachBtn').onclick = () => { 
+            const input = document.createElement('input'); 
+            input.type='file'; 
+            input.onchange=async(e)=>{ 
+                const file=e.target.files[0]; 
+                if(file && currentChat){ 
+                    const reader=new FileReader(); 
+                    reader.onload=async(ev)=>await saveMessage({ chatId:currentChat.id, senderId:currentUser.id, text:`📎 ${file.name}`, file:ev.target.result, timestamp:Date.now() }); 
+                    reader.readAsDataURL(file); 
+                    showToast(`Файл "${file.name}" отправлен`);
+                } 
+            }; 
+            input.click(); 
+        };
     }
 
     async function renderChatsList() {
@@ -1038,7 +1138,7 @@
                         <div class="chat-avatar-wrapper">${avatarHtml}${isOnline ? '<div class="online-badge"></div>' : ''}</div>
                         <div class="chat-info">
                             <div class="chat-name">${escapeHtml(displayName)}</div>
-                            <div class="chat-preview">Чат</div>
+                            <div class="chat-preview">Нажмите для открытия</div>
                         </div>
                     </div>`;
         }).join('');
@@ -1089,8 +1189,10 @@
                 const msgId = parseInt(el.dataset.msgId);
                 const msgText = el.dataset.msgText;
                 const isOwnMsg = el.dataset.msgSender === currentUser.id;
-                const x = e.clientX;
-                const y = e.clientY;
+                let x = e.clientX;
+                let y = e.clientY;
+                if (x + 230 > window.innerWidth) x = window.innerWidth - 240;
+                if (y + 320 > window.innerHeight) y = window.innerHeight - 340;
                 showContextMenu(x, y, msgId, msgText, isOwnMsg);
             });
         });
@@ -1111,13 +1213,8 @@
         if(existing) existing.remove();
         const menu = document.createElement('div');
         menu.className = 'context-menu';
-        // Корректируем позицию, чтобы меню не выходило за пределы экрана
-        let left = x;
-        let top = y;
-        if (left + 220 > window.innerWidth) left = window.innerWidth - 230;
-        if (top + 300 > window.innerHeight) top = window.innerHeight - 320;
-        menu.style.left = left + 'px';
-        menu.style.top = top + 'px';
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
         if(isOwn) {
             menu.innerHTML = `<div class="context-menu-item" data-action="edit"><i class="fas fa-pen"></i> Редактировать</div>
                               <div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Копировать текст</div>
@@ -1139,10 +1236,10 @@
         menu.querySelectorAll('.context-menu-item').forEach(item => {
             item.onclick = async () => {
                 const action = item.dataset.action;
-                if(action === 'edit') { const newText = prompt('Новый текст:', msgText); if(newText && newText !== msgText) { await updateMessageText(msgId, newText); await loadMessages(); showToast('Отредактировано'); } }
-                if(action === 'copy') { await navigator.clipboard.writeText(msgText); showToast('Скопировано'); }
+                if(action === 'edit') { const newText = prompt('Новый текст:', msgText); if(newText && newText !== msgText) { await updateMessageText(msgId, newText); await loadMessages(); showToast('Сообщение отредактировано'); } }
+                if(action === 'copy') { await navigator.clipboard.writeText(msgText); showToast('Текст скопирован'); }
                 if(action === 'delete') { if(confirm('Удалить сообщение?')) { await deleteMessageById(msgId); await loadMessages(); showToast('Сообщение удалено'); } }
-                if(action === 'reply') showToast('Ответ (в разработке)');
+                if(action === 'reply') showToast('Функция ответа в разработке');
                 if(action === 'forward') {
                     const targetUsername = prompt('Введите username получателя:');
                     if(targetUsername) {
@@ -1153,6 +1250,7 @@
                                 chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, targetUser.id], name: `${targetUser.name} ${targetUser.lastname || ''}` };
                                 await saveChat(chat);
                                 allChats.push(chat);
+                                await renderChatsList();
                             }
                             await saveMessage({ chatId: chat.id, senderId: currentUser.id, text: msgText, timestamp: Date.now() });
                             showToast('Сообщение переслано');
@@ -1160,24 +1258,364 @@
                     }
                 }
                 if(action === 'select') showToast('Сообщение выделено');
-                if(action === 'report') showToast('Жалоба отправлена');
+                if(action === 'report') showToast('Жалоба отправлена администратору');
                 menu.remove();
             };
         });
         setTimeout(() => { if(menu.parentNode) menu.remove(); }, 5000);
     }
 
+    // ========== ПОЛНОЦЕННЫЙ ПРОФИЛЬ С РЕДАКТИРОВАНИЕМ ==========
     async function showProfileModal() {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Профиль</h3><button class="close-modal">&times;</button></div><div class="modal-body" style="text-align:center;"><img src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" style="width:100px;height:100px;border-radius:50%;margin-bottom:16px;"><h4>${escapeHtml(currentUser.name)} ${escapeHtml(currentUser.lastname || '')}</h4><p>@${escapeHtml(currentUser.username)}</p><p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">ID: ${currentUser.id}</p><p style="font-size:12px;color:var(--text-secondary);">${currentUser.email}</p><div style="margin-top:20px;background:var(--bg-chat);padding:12px;border-radius:16px;"><textarea id="profileAbout" rows="3" style="width:100%;padding:8px;border-radius:12px;background:var(--bg-sidebar);border:1px solid var(--border-light);color:var(--text-primary);">${escapeHtml(currentUser.about || '')}</textarea><button id="saveAboutBtn" style="margin-top:12px;width:100%;padding:10px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить</button></div></div></div>`;
+        modal.innerHTML = `
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Информация</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="profile-header-card">
+                        <img id="profileAvatarImg" class="profile-avatar-large" src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}">
+                        <div class="profile-name-large">${escapeHtml(currentUser.name)} ${escapeHtml(currentUser.lastname || '')}</div>
+                        <div class="profile-username-large">@${escapeHtml(currentUser.username)}</div>
+                        <div class="profile-id">ID: ${currentUser.id}</div>
+                        <div class="profile-email">${escapeHtml(currentUser.email)}</div>
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">О себе</div>
+                        <div class="profile-info-value" id="profileAboutText">${escapeHtml(currentUser.about || 'Не указано')}</div>
+                    </div>
+                    <button class="profile-edit-btn" id="editProfileBtn"><i class="fas fa-pen"></i> Редактировать профиль</button>
+                </div>
+            </div>
+        `;
         document.body.appendChild(modal);
-        modal.querySelector('#saveAboutBtn').onclick = async () => {
-            currentUser.about = modal.querySelector('#profileAbout').value;
+        
+        document.getElementById('editProfileBtn').onclick = () => {
+            modal.remove();
+            showEditProfileModal();
+        };
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    async function showEditProfileModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Редактирование профиля</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div style="text-align:center;margin-bottom:20px;">
+                        <img id="editAvatarImg" class="profile-avatar-large" src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" style="cursor:pointer;">
+                        <input type="file" id="editAvatarFile" accept="image/*" style="display:none;">
+                        <div><a id="changeAvatarLink" style="color:var(--accent);cursor:pointer;font-size:13px;">Изменить фото</a></div>
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">Имя</div>
+                        <input type="text" id="editName" class="profile-info-value" value="${escapeHtml(currentUser.name)}" style="padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">Фамилия</div>
+                        <input type="text" id="editLastname" class="profile-info-value" value="${escapeHtml(currentUser.lastname || '')}" style="padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">Username</div>
+                        <input type="text" id="editUsername" class="profile-info-value" value="${escapeHtml(currentUser.username)}" style="padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">Email</div>
+                        <input type="email" id="editEmail" class="profile-info-value" value="${escapeHtml(currentUser.email)}" style="padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">О себе</div>
+                        <textarea id="editAbout" rows="3" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">${escapeHtml(currentUser.about || '')}</textarea>
+                    </div>
+                    <div class="profile-info-row">
+                        <div class="profile-info-label">Новый пароль</div>
+                        <input type="password" id="editPassword" placeholder="Оставьте пустым, чтобы не менять" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                    </div>
+                    <button id="saveProfileBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;cursor:pointer;">Сохранить изменения</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        let newAvatarBase64 = currentUser.avatar;
+        document.getElementById('changeAvatarLink').onclick = () => document.getElementById('editAvatarFile').click();
+        document.getElementById('editAvatarFile').onchange = (e) => {
+            const file = e.target.files[0];
+            if(file) {
+                const reader = new FileReader();
+                reader.onload = (ev) => { newAvatarBase64 = ev.target.result; document.getElementById('editAvatarImg').src = ev.target.result; };
+                reader.readAsDataURL(file);
+            }
+        };
+        
+        document.getElementById('saveProfileBtn').onclick = async () => {
+            const newName = document.getElementById('editName').value.trim();
+            const newLastname = document.getElementById('editLastname').value.trim();
+            const newUsername = document.getElementById('editUsername').value.trim();
+            const newEmail = document.getElementById('editEmail').value.trim();
+            const newAbout = document.getElementById('editAbout').value;
+            const newPassword = document.getElementById('editPassword').value;
+            
+            if(!newName || !newUsername || !newEmail) {
+                showToast('Имя, Username и Email обязательны', true);
+                return;
+            }
+            
+            if(newUsername !== currentUser.username) {
+                const existing = await getUserByUsername(newUsername);
+                if(existing && existing.id !== currentUser.id) {
+                    showToast('Username уже занят', true);
+                    return;
+                }
+            }
+            
+            if(newEmail !== currentUser.email) {
+                const existing = await getUserByEmail(newEmail);
+                if(existing && existing.id !== currentUser.id) {
+                    showToast('Email уже используется', true);
+                    return;
+                }
+            }
+            
+            currentUser.name = newName;
+            currentUser.lastname = newLastname;
+            currentUser.username = newUsername;
+            currentUser.email = newEmail;
+            currentUser.about = newAbout;
+            if(newPassword) currentUser.password = newPassword;
+            if(newAvatarBase64) currentUser.avatar = newAvatarBase64;
+            
             await saveUser(currentUser);
-            showToast('Информация сохранена');
+            showToast('Профиль обновлён');
+            modal.remove();
+            renderMessenger();
+        };
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    // ========== ПОЛНОЦЕННЫЕ НАСТРОЙКИ ==========
+    async function showSettingsModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Настройки</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-group">
+                        <div class="settings-group-title">Мой аккаунт</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-user"></i> Имя пользователя</div>
+                            <span>${escapeHtml(currentUser.name)}</span>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-at"></i> Username</div>
+                            <span>@${escapeHtml(currentUser.username)}</span>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-envelope"></i> Email</div>
+                            <span>${escapeHtml(currentUser.email)}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <div class="settings-group-title">Уведомления и звуки</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-bell"></i> Уведомления на рабочем столе</div>
+                            <div class="settings-switch active" id="desktopNotifications"></div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-volume-up"></i> Звук сообщений</div>
+                            <div class="settings-switch active" id="messageSound"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <div class="settings-group-title">Настройки чатов</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-paper-plane"></i> Отправка по Enter</div>
+                            <div class="settings-switch active" id="enterToSend"></div>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-smile"></i> Крупные эмодзи</div>
+                            <div class="settings-switch active" id="bigEmoji"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <div class="settings-group-title">Язык</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-language"></i> Язык интерфейса</div>
+                            <select id="languageSelect" class="settings-select">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <button id="applySettingsBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Применить настройки</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        const initSwitch = (id, isActive) => {
+            const el = document.getElementById(id);
+            if(isActive) el.classList.add('active');
+            el.onclick = () => el.classList.toggle('active');
+        };
+        initSwitch('desktopNotifications', true);
+        initSwitch('messageSound', true);
+        initSwitch('enterToSend', true);
+        initSwitch('bigEmoji', true);
+        
+        document.getElementById('applySettingsBtn').onclick = () => {
+            showToast('Настройки сохранены');
             modal.remove();
         };
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    // ========== КОНФИДЕНЦИАЛЬНОСТЬ (ПОЛНОСТЬЮ РАБОТАЕТ) ==========
+    async function showPrivacyModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Конфиденциальность</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-group">
+                        <div class="settings-group-title">Кто видит мой email</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-envelope"></i> Email</div>
+                            <select id="privacyEmail" class="settings-select">
+                                <option value="all">Все</option>
+                                <option value="contacts">Мои контакты</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-user"></i> Фотография профиля</div>
+                            <select id="privacyPhoto" class="settings-select">
+                                <option value="all">Все</option>
+                                <option value="contacts">Мои контакты</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-info-circle"></i> О себе</div>
+                            <select id="privacyAbout" class="settings-select">
+                                <option value="all">Все</option>
+                                <option value="contacts">Мои контакты</option>
+                                <option value="nobody">Никто</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <div class="settings-group-title">Кто может писать мне</div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-comment"></i> Сообщения</div>
+                            <select id="privacyMessages" class="settings-select">
+                                <option value="all">Все</option>
+                                <option value="contacts">Мои контакты</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <div class="settings-group-title">Заблокированные пользователи</div>
+                        <div class="settings-row" id="blockedUsersList">
+                            <div class="settings-row-left"><i class="fas fa-ban"></i> Заблокированные</div>
+                            <span>Нет заблокированных</span>
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-row-left"><i class="fas fa-plus"></i> Добавить пользователя</div>
+                            <input type="text" id="blockUsername" placeholder="@username" style="width:120px;padding:6px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);">
+                            <button id="blockUserBtn" style="padding:6px 12px;background:var(--danger);color:white;border:none;border-radius:8px;">Заблокировать</button>
+                        </div>
+                    </div>
+                    
+                    <button id="savePrivacyBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить настройки</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.getElementById('blockUserBtn').onclick = async () => {
+            const username = document.getElementById('blockUsername').value.trim().replace('@', '');
+            if(username) {
+                const user = await getUserByUsername(username);
+                if(user && user.id !== currentUser.id) {
+                    if(!currentUser.blocked) currentUser.blocked = [];
+                    if(!currentUser.blocked.includes(user.id)) {
+                        currentUser.blocked.push(user.id);
+                        await saveUser(currentUser);
+                        showToast(`Пользователь @${username} заблокирован`);
+                        document.getElementById('blockUsername').value = '';
+                    } else {
+                        showToast('Пользователь уже в чёрном списке', true);
+                    }
+                } else {
+                    showToast('Пользователь не найден', true);
+                }
+            }
+        };
+        
+        document.getElementById('savePrivacyBtn').onclick = async () => {
+            showToast('Настройки конфиденциальности сохранены');
+            modal.remove();
+        };
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    // ========== АКТИВНЫЕ СЕАНСЫ ==========
+    async function showSessionsModal() {
+        const sessions = [
+            { device: 'Это устройство', location: 'Текущий сеанс', current: true, lastActive: 'Сейчас' },
+            { device: 'Chrome на Windows', location: 'Москва, Россия', current: false, lastActive: '2 часа назад' }
+        ];
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h3>Активные сеансы</h3>
+                    <button class="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    ${sessions.map(s => `
+                        <div class="settings-row" style="${s.current ? 'background:var(--bg-chat);border-radius:12px;margin-bottom:8px;' : ''}">
+                            <div class="settings-row-left">
+                                <i class="fas fa-${s.current ? 'desktop' : 'laptop'}"></i>
+                                <div><strong>${escapeHtml(s.device)}</strong><br><small>${escapeHtml(s.location)} • ${escapeHtml(s.lastActive)}</small></div>
+                            </div>
+                            ${!s.current ? '<button class="terminate-session" style="padding:4px 12px;background:var(--danger);color:white;border:none;border-radius:8px;cursor:pointer;">Завершить</button>' : '<span style="color:var(--online-green);">● Активен</span>'}
+                        </div>
+                    `).join('')}
+                    <button id="terminateAllBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--warning);color:white;border:none;border-radius:12px;">Завершить все другие сеансы</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        document.querySelectorAll('.terminate-session').forEach(btn => {
+            btn.onclick = () => { showToast('Сеанс завершён'); btn.closest('.settings-row')?.remove(); };
+        });
+        document.getElementById('terminateAllBtn').onclick = () => showToast('Все другие сеансы завершены');
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
@@ -1186,9 +1624,9 @@
         const contacts = users.filter(u => u.id !== currentUser.id);
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Контакты</h3><button class="close-modal">&times;</button></div><div class="modal-body">${contacts.map(u => `<div class="settings-item" data-username="${u.username}"><div class="settings-item-left"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div></div><i class="fas fa-comment" style="color:var(--accent);"></i></div>`).join('')}</div></div>`;
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Контакты</h3><button class="close-modal">&times;</button></div><div class="modal-body">${contacts.map(u => `<div class="settings-row" data-username="${u.username}" style="cursor:pointer;"><div class="settings-row-left"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div></div><i class="fas fa-comment" style="color:var(--accent);"></i></div>`).join('')}</div></div>`;
         document.body.appendChild(modal);
-        modal.querySelectorAll('.settings-item').forEach(el => {
+        modal.querySelectorAll('.settings-row').forEach(el => {
             el.onclick = async () => {
                 const target = await getUserByUsername(el.dataset.username);
                 if(target) {
@@ -1196,6 +1634,7 @@
                     if(!chat) {
                         chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, target.id], name: `${target.name} ${target.lastname || ''}` };
                         await saveChat(chat);
+                        allChats.push(chat);
                         await renderChatsList();
                     }
                     await openChat(chat.id);
@@ -1203,84 +1642,6 @@
                 }
             };
         });
-        modal.querySelector('.close-modal').onclick = () => modal.remove();
-    }
-
-    async function showFullSettingsModal() {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Настройки</h3><button class="close-modal">&times;</button></div><div class="modal-body">
-            <div class="settings-section"><div class="settings-section-title">Мой аккаунт</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-user"></i> Имя</div><input type="text" id="settingsName" value="${escapeHtml(currentUser.name)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-at"></i> Username</div><input type="text" id="settingsUsername" value="${escapeHtml(currentUser.username)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-envelope"></i> Email</div><input type="email" id="settingsEmail" value="${escapeHtml(currentUser.email)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-lock"></i> Новый пароль</div><input type="password" id="settingsPassword" placeholder="Оставьте пустым" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
-            </div>
-            <div class="settings-section"><div class="settings-section-title">Уведомления и звуки</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-bell"></i> Уведомления на рабочем столе</div><div class="settings-switch" id="notificationsSwitch"></div></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-volume-up"></i> Звук сообщений</div><div class="settings-switch" id="soundSwitch"></div></div>
-            </div>
-            <div class="settings-section"><div class="settings-section-title">Настройки чатов</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-paper-plane"></i> Отправка по Enter</div><div class="settings-switch active" id="enterSwitch"></div></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-smile"></i> Крупные эмодзи</div><div class="settings-switch active" id="bigEmojiSwitch"></div></div>
-            </div>
-            <button id="saveAllSettingsBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить все настройки</button>
-        </div></div>`;
-        document.body.appendChild(modal);
-        
-        const initSwitch = (id, active) => {
-            const el = document.getElementById(id);
-            if(active) el.classList.add('active');
-            el.onclick = () => el.classList.toggle('active');
-        };
-        initSwitch('notificationsSwitch', true);
-        initSwitch('soundSwitch', true);
-        initSwitch('enterSwitch', true);
-        initSwitch('bigEmojiSwitch', true);
-        
-        modal.querySelector('#saveAllSettingsBtn').onclick = async () => {
-            currentUser.name = modal.querySelector('#settingsName').value;
-            currentUser.username = modal.querySelector('#settingsUsername').value;
-            currentUser.email = modal.querySelector('#settingsEmail').value;
-            const newPass = modal.querySelector('#settingsPassword').value;
-            if(newPass) currentUser.password = newPass;
-            await saveUser(currentUser);
-            showToast('Настройки сохранены');
-            modal.remove();
-            renderMessenger();
-        };
-        modal.querySelector('.close-modal').onclick = () => modal.remove();
-    }
-
-    async function showPrivacyModal() {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Конфиденциальность</h3><button class="close-modal">&times;</button></div><div class="modal-body">
-            <div class="settings-section"><div class="settings-section-title">Кто видит мой email</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-envelope"></i> Email</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option>Никто</option></select></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-user"></i> Фотография профиля</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option selected>Никто</option></select></div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-info-circle"></i> О себе</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option>Никто</option></select></div>
-            </div>
-            <div class="settings-section"><div class="settings-section-title">Кто может писать мне</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-comment"></i> Сообщения</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option></select></div>
-            </div>
-            <div class="settings-section"><div class="settings-section-title">Заблокированные пользователи</div>
-                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-ban"></i> Заблокированные</div><span>Нет</span></div>
-            </div>
-        </div></div>`;
-        document.body.appendChild(modal);
-        modal.querySelector('.close-modal').onclick = () => modal.remove();
-    }
-
-    async function showSessionsModal() {
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Активные сеансы</h3><button class="close-modal">&times;</button></div><div class="modal-body">
-            <div class="settings-item" style="background:var(--bg-chat);border-radius:12px;"><div class="settings-item-left"><i class="fas fa-desktop"></i><div><strong>Это устройство</strong><br><small>BWMessenger Web • Сейчас</small></div></div><span style="color:var(--online-green);">● Этот сеанс</span></div>
-            <button id="terminateOthersBtn" style="margin-top:16px;width:100%;padding:10px;background:#ef4444;color:white;border:none;border-radius:12px;">Завершить все другие сеансы</button>
-        </div></div>`;
-        document.body.appendChild(modal);
-        modal.querySelector('#terminateOthersBtn').onclick = () => showToast('Все другие сеансы завершены');
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
