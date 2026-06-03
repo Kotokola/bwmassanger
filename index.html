@@ -52,7 +52,6 @@
             height: 100vh;
         }
 
-        /* Анимации */
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
@@ -60,10 +59,6 @@
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
         }
 
         /* Модальное окно */
@@ -85,7 +80,7 @@
             background: var(--bg-sidebar);
             border-radius: 28px;
             width: 90%;
-            max-width: 480px;
+            max-width: 500px;
             max-height: 85vh;
             overflow-y: auto;
             animation: fadeIn 0.2s ease;
@@ -110,7 +105,7 @@
         }
         .close-modal:hover { color: var(--text-primary); }
 
-        /* Контекстное меню */
+        /* Контекстное меню - фикс позиционирования */
         .context-menu {
             position: fixed;
             background: var(--bg-sidebar);
@@ -139,7 +134,7 @@
             margin: 6px 0;
         }
 
-        /* Боковое меню (drawer) */
+        /* Боковое меню (drawer) как в Telegram */
         .drawer {
             position: fixed;
             top: 0;
@@ -534,6 +529,51 @@
             .sidebar-panel.mobile-open { transform: translateX(0); }
             .message-bubble { max-width: 85%; }
         }
+
+        /* Стили для настроек */
+        .settings-section {
+            margin-bottom: 24px;
+        }
+        .settings-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+        .settings-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-light);
+            cursor: pointer;
+        }
+        .settings-item:hover { background: var(--bg-chat); }
+        .settings-item-left { display: flex; align-items: center; gap: 12px; }
+        .settings-item-left i { width: 24px; color: var(--text-secondary); }
+        .settings-switch {
+            width: 44px;
+            height: 24px;
+            background: var(--border-light);
+            border-radius: 24px;
+            position: relative;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .settings-switch.active { background: var(--accent); }
+        .settings-switch::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.2s;
+        }
+        .settings-switch.active::after { left: 22px; }
     </style>
 </head>
 <body>
@@ -544,7 +584,7 @@
 
     // ========== IndexedDB ==========
     const DB_NAME = 'BWMessengerDB';
-    const DB_VERSION = 12;
+    const DB_VERSION = 13;
     let db = null;
     let currentUser = null;
     let currentChat = null;
@@ -686,7 +726,6 @@
         } catch(e) { showToast('❌ Ошибка отправки', true); return false; }
     }
 
-    // ========== Рендер приложения ==========
     const root = document.getElementById('root');
 
     async function init() {
@@ -862,8 +901,13 @@
                     </div>
                 </div>
                 <div class="drawer-item" id="drawerProfile"><i class="fas fa-user"></i> Мой профиль</div>
+                <div class="drawer-item" id="drawerContacts"><i class="fas fa-address-book"></i> Контакты</div>
+                <div class="drawer-item" id="drawerCalls"><i class="fas fa-phone"></i> Звонки</div>
+                <div class="drawer-item" id="drawerSaved"><i class="fas fa-bookmark"></i> Избранное</div>
                 <div class="drawer-item" id="drawerSettings"><i class="fas fa-sliders-h"></i> Настройки</div>
                 <div class="drawer-item" id="drawerPrivacy"><i class="fas fa-lock"></i> Конфиденциальность</div>
+                <div class="drawer-item" id="drawerSessions"><i class="fas fa-laptop"></i> Активные сеансы</div>
+                <div class="drawer-item" id="drawerNightMode"><i class="fas fa-moon"></i> Ночной режим</div>
                 <div class="drawer-item" id="drawerLogout"><i class="fas fa-sign-out-alt"></i> Выйти</div>
             </div>
             <div class="messenger-layout">
@@ -871,7 +915,6 @@
                     <div class="sidebar-header">
                         <img class="user-avatar-small" src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" id="openDrawerBtn">
                         <div class="header-actions">
-                            <button class="icon-btn" id="themeToggleBtn"><i class="fas fa-moon"></i></button>
                             <button class="icon-btn" id="newGroupBtn"><i class="fas fa-plus-circle"></i></button>
                         </div>
                     </div>
@@ -880,6 +923,7 @@
                         <div id="searchResultsDropdown" class="search-results" style="display:none;"></div>
                     </div>
                     <div class="chats-scroll" id="chatsListContainer"></div>
+                    <button class="create-group-btn" id="createGroupFooterBtn"><i class="fas fa-users"></i> Создать группу</button>
                 </div>
                 <div class="chat-container">
                     <div class="chat-header-area" id="chatHeaderArea">
@@ -902,13 +946,23 @@
         const overlay = document.getElementById('drawerOverlay');
         document.getElementById('openDrawerBtn').onclick = () => { drawer.classList.add('open'); overlay.classList.add('show'); };
         overlay.onclick = () => { drawer.classList.remove('open'); overlay.classList.remove('show'); };
-        document.getElementById('themeToggleBtn').onclick = () => document.body.classList.toggle('dark');
         
         document.getElementById('drawerProfile').onclick = () => { showProfileModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
-        document.getElementById('drawerSettings').onclick = () => { showSettingsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
-        document.getElementById('drawerPrivacy').onclick = () => showToast('Настройки приватности (в разработке)');
+        document.getElementById('drawerContacts').onclick = () => { showContactsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerCalls').onclick = () => { showToast('Звонки (в разработке)'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerSaved').onclick = async () => { 
+            const savedChat = allChats.find(c => c.type === 'saved' && c.userId === currentUser.id);
+            if(savedChat) await openChat(savedChat.id);
+            drawer.classList.remove('open'); overlay.classList.remove('show');
+        };
+        document.getElementById('drawerSettings').onclick = () => { showFullSettingsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerPrivacy').onclick = () => { showPrivacyModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerSessions').onclick = () => { showSessionsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerNightMode').onclick = () => { document.body.classList.toggle('dark'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerLogout').onclick = async () => { await clearSession(); location.reload(); };
+        
         document.getElementById('newGroupBtn').onclick = async () => { const name = prompt('Название группы'); if(name) { await saveChat({ id: `group_${Date.now()}`, type: 'group', name, participants: [currentUser.id], createdAt: Date.now() }); await renderChatsList(); } };
+        document.getElementById('createGroupFooterBtn').onclick = document.getElementById('newGroupBtn').onclick;
 
         await renderChatsList();
         
@@ -916,17 +970,20 @@
         const searchResults = document.getElementById('searchResultsDropdown');
         searchInput.oninput = async (e) => {
             const query = e.target.value.trim();
-            if(query.length < 2) { searchResults.style.display = 'none'; return; }
+            if(query.length < 1) { searchResults.style.display = 'none'; return; }
             const cleanQuery = query.startsWith('@') ? query.slice(1) : query;
             const users = await getUsers();
-            const filtered = users.filter(u => u.id !== currentUser.id && (u.username.toLowerCase().includes(cleanQuery.toLowerCase()) || u.name.toLowerCase().includes(cleanQuery.toLowerCase())));
+            const filtered = users.filter(u => u.id !== currentUser.id && 
+                (u.username.toLowerCase().includes(cleanQuery.toLowerCase()) || 
+                 u.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+                 (u.lastname && u.lastname.toLowerCase().includes(cleanQuery.toLowerCase()))));
             if(filtered.length) {
-                searchResults.innerHTML = filtered.map(u => `<div class="search-result-item" data-uid="${u.id}"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)}</strong><br><small>@${escapeHtml(u.username)}</small></div></div>`).join('');
+                searchResults.innerHTML = filtered.map(u => `<div class="search-result-item" data-username="${u.username}"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div></div>`).join('');
                 searchResults.style.display = 'block';
                 document.querySelectorAll('.search-result-item').forEach(el => {
                     el.onclick = async () => {
-                        const targetId = el.dataset.uid;
-                        const target = await getUserByEmail((await getUsers()).find(u=>u.id===targetId)?.email);
+                        const targetUsername = el.dataset.username;
+                        const target = await getUserByUsername(targetUsername);
                         if(target) {
                             let chat = allChats.find(c => c.type === 'private' && c.participants?.includes(currentUser.id) && c.participants?.includes(target.id));
                             if(!chat) {
@@ -941,11 +998,11 @@
                     };
                 });
             } else {
-                searchResults.innerHTML = `<div class="search-result-item" style="justify-content:center;">❌ Пользователь не найден</div>`;
+                searchResults.innerHTML = `<div class="search-result-item" style="justify-content:center;color:var(--text-secondary);"><i class="fas fa-user-slash"></i> Пользователь не найден</div>`;
                 searchResults.style.display = 'block';
             }
         };
-        document.addEventListener('click', (e) => { if(!searchInput.contains(e.target) && !searchResults.contains(e.target)) searchResults.style.display = 'none'; });
+        document.addEventListener('click', (e) => { if(searchInput && !searchInput.contains(e.target) && !searchResults.contains(e.target)) searchResults.style.display = 'none'; });
 
         const mobileToggle = document.getElementById('mobileMenuToggle');
         const sidebarPanel = document.getElementById('sidebarPanel');
@@ -974,9 +1031,9 @@
                 const other = users.find(u => u.id === otherId);
                 displayName = other ? `${other.name} ${other.lastname || ''}` : 'Unknown';
                 isOnline = other?.online || false;
-                avatarHtml = other?.avatar ? `<img class="chat-avatar" src="${other.avatar}">` : `<div class="chat-avatar">${displayName[0]}</div>`;
+                avatarHtml = other?.avatar ? `<img class="chat-avatar" src="${other.avatar}">` : `<div class="chat-avatar">${displayName.charAt(0).toUpperCase()}</div>`;
             } else if(chat.type === 'saved') { displayName = '⭐ Избранное'; avatarHtml = '<div class="chat-avatar">⭐</div>'; }
-            else { avatarHtml = `<div class="chat-avatar">${chat.name[0]}</div>`; }
+            else { avatarHtml = `<div class="chat-avatar">${chat.name.charAt(0).toUpperCase()}</div>`; }
             return `<div class="chat-row" data-chat-id="${chat.id}">
                         <div class="chat-avatar-wrapper">${avatarHtml}${isOnline ? '<div class="online-badge"></div>' : ''}</div>
                         <div class="chat-info">
@@ -998,10 +1055,10 @@
             const otherId = currentChat.participants.find(id => id !== currentUser.id);
             const other = users.find(u => u.id === otherId);
             headerText = other ? `${other.name} ${other.lastname || ''}` : 'Чат';
-            headerAvatar = other?.avatar ? `<img class="chat-avatar" style="width:44px;height:44px;" src="${other.avatar}">` : `<div class="chat-avatar" style="width:44px;height:44px;">${headerText[0]}</div>`;
+            headerAvatar = other?.avatar ? `<img class="chat-avatar" style="width:44px;height:44px;" src="${other.avatar}">` : `<div class="chat-avatar" style="width:44px;height:44px;">${headerText.charAt(0).toUpperCase()}</div>`;
         } else if(currentChat.type === 'saved') { headerText = '⭐ Избранное'; headerAvatar = '<div class="chat-avatar" style="width:44px;height:44px;">⭐</div>'; }
-        else { headerText = currentChat.name; headerAvatar = `<div class="chat-avatar" style="width:44px;height:44px;">${headerText[0]}</div>`; }
-        document.getElementById('chatHeaderArea').innerHTML = `<i class="fas fa-bars" id="mobileMenuToggle2" style="display:${window.innerWidth<=768?'block':'none'};font-size:24px;cursor:pointer;"></i>${headerAvatar}<div><strong>${escapeHtml(headerText)}</strong><br><span style="font-size:12px;color:var(--text-secondary)">онлайн</span></div>`;
+        else { headerText = currentChat.name; headerAvatar = `<div class="chat-avatar" style="width:44px;height:44px;">${headerText.charAt(0).toUpperCase()}</div>`; }
+        document.getElementById('chatHeaderArea').innerHTML = `<i class="fas fa-bars" id="mobileMenuToggle2" style="display:${window.innerWidth<=768?'block':'none'};font-size:24px;cursor:pointer;"></i>${headerAvatar}<div><strong>${escapeHtml(headerText)}</strong><br><span style="font-size:12px;color:var(--text-secondary)">в сети</span></div>`;
         if(window.innerWidth<=768) document.getElementById('mobileMenuToggle2').onclick = () => document.getElementById('sidebarPanel').classList.toggle('mobile-open');
         await loadMessages();
         document.querySelectorAll('.chat-row').forEach(el => el.classList.remove('active'));
@@ -1032,7 +1089,9 @@
                 const msgId = parseInt(el.dataset.msgId);
                 const msgText = el.dataset.msgText;
                 const isOwnMsg = el.dataset.msgSender === currentUser.id;
-                showContextMenu(e.clientX, e.clientY, msgId, msgText, isOwnMsg);
+                const x = e.clientX;
+                const y = e.clientY;
+                showContextMenu(x, y, msgId, msgText, isOwnMsg);
             });
         });
     }
@@ -1052,27 +1111,55 @@
         if(existing) existing.remove();
         const menu = document.createElement('div');
         menu.className = 'context-menu';
-        menu.style.left = x + 'px';
-        menu.style.top = y + 'px';
+        // Корректируем позицию, чтобы меню не выходило за пределы экрана
+        let left = x;
+        let top = y;
+        if (left + 220 > window.innerWidth) left = window.innerWidth - 230;
+        if (top + 300 > window.innerHeight) top = window.innerHeight - 320;
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
         if(isOwn) {
             menu.innerHTML = `<div class="context-menu-item" data-action="edit"><i class="fas fa-pen"></i> Редактировать</div>
                               <div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Копировать текст</div>
                               <div class="context-menu-divider"></div>
                               <div class="context-menu-item" data-action="reply"><i class="fas fa-reply"></i> Ответить</div>
-                              <div class="context-menu-item" data-action="delete"><i class="fas fa-trash"></i> Удалить</div>`;
+                              <div class="context-menu-item" data-action="forward"><i class="fas fa-share"></i> Переслать</div>
+                              <div class="context-menu-divider"></div>
+                              <div class="context-menu-item" data-action="delete"><i class="fas fa-trash"></i> Удалить</div>
+                              <div class="context-menu-item" data-action="select"><i class="fas fa-check-circle"></i> Выделить</div>`;
         } else {
-            menu.innerHTML = `<div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Копировать текст</div>
-                              <div class="context-menu-item" data-action="reply"><i class="fas fa-reply"></i> Ответить</div>
+            menu.innerHTML = `<div class="context-menu-item" data-action="reply"><i class="fas fa-reply"></i> Ответить</div>
+                              <div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Копировать текст</div>
+                              <div class="context-menu-item" data-action="forward"><i class="fas fa-share"></i> Переслать</div>
+                              <div class="context-menu-divider"></div>
+                              <div class="context-menu-item" data-action="select"><i class="fas fa-check-circle"></i> Выделить</div>
                               <div class="context-menu-item" data-action="report"><i class="fas fa-flag"></i> Пожаловаться</div>`;
         }
         document.body.appendChild(menu);
         menu.querySelectorAll('.context-menu-item').forEach(item => {
             item.onclick = async () => {
                 const action = item.dataset.action;
-                if(action === 'edit') { const newText = prompt('Новый текст:', msgText); if(newText) { await updateMessageText(msgId, newText); await loadMessages(); showToast('Отредактировано'); } }
+                if(action === 'edit') { const newText = prompt('Новый текст:', msgText); if(newText && newText !== msgText) { await updateMessageText(msgId, newText); await loadMessages(); showToast('Отредактировано'); } }
                 if(action === 'copy') { await navigator.clipboard.writeText(msgText); showToast('Скопировано'); }
-                if(action === 'delete') { if(confirm('Удалить?')) { await deleteMessageById(msgId); await loadMessages(); showToast('Удалено'); } }
+                if(action === 'delete') { if(confirm('Удалить сообщение?')) { await deleteMessageById(msgId); await loadMessages(); showToast('Сообщение удалено'); } }
                 if(action === 'reply') showToast('Ответ (в разработке)');
+                if(action === 'forward') {
+                    const targetUsername = prompt('Введите username получателя:');
+                    if(targetUsername) {
+                        const targetUser = await getUserByUsername(targetUsername);
+                        if(targetUser) {
+                            let chat = allChats.find(c => c.type === 'private' && c.participants?.includes(currentUser.id) && c.participants?.includes(targetUser.id));
+                            if(!chat) {
+                                chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, targetUser.id], name: `${targetUser.name} ${targetUser.lastname || ''}` };
+                                await saveChat(chat);
+                                allChats.push(chat);
+                            }
+                            await saveMessage({ chatId: chat.id, senderId: currentUser.id, text: msgText, timestamp: Date.now() });
+                            showToast('Сообщение переслано');
+                        } else showToast('Пользователь не найден', true);
+                    }
+                }
+                if(action === 'select') showToast('Сообщение выделено');
                 if(action === 'report') showToast('Жалоба отправлена');
                 menu.remove();
             };
@@ -1083,17 +1170,75 @@
     async function showProfileModal() {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Профиль</h3><button class="close-modal">&times;</button></div><div class="modal-body" style="text-align:center;"><img src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" style="width:100px;height:100px;border-radius:50%;margin-bottom:16px;"><h4>${escapeHtml(currentUser.name)} ${escapeHtml(currentUser.lastname || '')}</h4><p>@${escapeHtml(currentUser.username)}</p><p style="font-size:12px;color:var(--text-secondary);margin-top:8px;">ID: ${currentUser.id}</p><div style="margin-top:20px;background:var(--bg-chat);padding:12px;border-radius:16px;"><small>${currentUser.about || 'О себе пока ничего...'}</small></div></div></div>`;
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Профиль</h3><button class="close-modal">&times;</button></div><div class="modal-body" style="text-align:center;"><img src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" style="width:100px;height:100px;border-radius:50%;margin-bottom:16px;"><h4>${escapeHtml(currentUser.name)} ${escapeHtml(currentUser.lastname || '')}</h4><p>@${escapeHtml(currentUser.username)}</p><p style="font-size:12px;color:var(--text-secondary);margin-top:4px;">ID: ${currentUser.id}</p><p style="font-size:12px;color:var(--text-secondary);">${currentUser.email}</p><div style="margin-top:20px;background:var(--bg-chat);padding:12px;border-radius:16px;"><textarea id="profileAbout" rows="3" style="width:100%;padding:8px;border-radius:12px;background:var(--bg-sidebar);border:1px solid var(--border-light);color:var(--text-primary);">${escapeHtml(currentUser.about || '')}</textarea><button id="saveAboutBtn" style="margin-top:12px;width:100%;padding:10px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить</button></div></div></div>`;
         document.body.appendChild(modal);
+        modal.querySelector('#saveAboutBtn').onclick = async () => {
+            currentUser.about = modal.querySelector('#profileAbout').value;
+            await saveUser(currentUser);
+            showToast('Информация сохранена');
+            modal.remove();
+        };
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
-    async function showSettingsModal() {
+    async function showContactsModal() {
+        const users = await getUsers();
+        const contacts = users.filter(u => u.id !== currentUser.id);
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Настройки</h3><button class="close-modal">&times;</button></div><div class="modal-body"><input type="text" id="settingsName" placeholder="Имя" value="${escapeHtml(currentUser.name)}" style="width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1px solid var(--border-light);background:var(--bg-chat);"><input type="text" id="settingsUsername" placeholder="Username" value="${escapeHtml(currentUser.username)}" style="width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1px solid var(--border-light);background:var(--bg-chat);"><input type="email" id="settingsEmail" placeholder="Email" value="${escapeHtml(currentUser.email)}" style="width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1px solid var(--border-light);background:var(--bg-chat);"><input type="password" id="settingsPassword" placeholder="Новый пароль (оставьте пустым)" style="width:100%;padding:12px;margin-bottom:12px;border-radius:12px;border:1px solid var(--border-light);background:var(--bg-chat);"><button id="saveSettingsBtn" style="width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;cursor:pointer;">Сохранить</button></div></div>`;
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Контакты</h3><button class="close-modal">&times;</button></div><div class="modal-body">${contacts.map(u => `<div class="settings-item" data-username="${u.username}"><div class="settings-item-left"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div></div><i class="fas fa-comment" style="color:var(--accent);"></i></div>`).join('')}</div></div>`;
         document.body.appendChild(modal);
-        modal.querySelector('#saveSettingsBtn').onclick = async () => {
+        modal.querySelectorAll('.settings-item').forEach(el => {
+            el.onclick = async () => {
+                const target = await getUserByUsername(el.dataset.username);
+                if(target) {
+                    let chat = allChats.find(c => c.type === 'private' && c.participants?.includes(currentUser.id) && c.participants?.includes(target.id));
+                    if(!chat) {
+                        chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, target.id], name: `${target.name} ${target.lastname || ''}` };
+                        await saveChat(chat);
+                        await renderChatsList();
+                    }
+                    await openChat(chat.id);
+                    modal.remove();
+                }
+            };
+        });
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    async function showFullSettingsModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Настройки</h3><button class="close-modal">&times;</button></div><div class="modal-body">
+            <div class="settings-section"><div class="settings-section-title">Мой аккаунт</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-user"></i> Имя</div><input type="text" id="settingsName" value="${escapeHtml(currentUser.name)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-at"></i> Username</div><input type="text" id="settingsUsername" value="${escapeHtml(currentUser.username)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-envelope"></i> Email</div><input type="email" id="settingsEmail" value="${escapeHtml(currentUser.email)}" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-lock"></i> Новый пароль</div><input type="password" id="settingsPassword" placeholder="Оставьте пустым" style="width:150px;padding:4px 8px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);color:var(--text-primary);"></div>
+            </div>
+            <div class="settings-section"><div class="settings-section-title">Уведомления и звуки</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-bell"></i> Уведомления на рабочем столе</div><div class="settings-switch" id="notificationsSwitch"></div></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-volume-up"></i> Звук сообщений</div><div class="settings-switch" id="soundSwitch"></div></div>
+            </div>
+            <div class="settings-section"><div class="settings-section-title">Настройки чатов</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-paper-plane"></i> Отправка по Enter</div><div class="settings-switch active" id="enterSwitch"></div></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-smile"></i> Крупные эмодзи</div><div class="settings-switch active" id="bigEmojiSwitch"></div></div>
+            </div>
+            <button id="saveAllSettingsBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить все настройки</button>
+        </div></div>`;
+        document.body.appendChild(modal);
+        
+        const initSwitch = (id, active) => {
+            const el = document.getElementById(id);
+            if(active) el.classList.add('active');
+            el.onclick = () => el.classList.toggle('active');
+        };
+        initSwitch('notificationsSwitch', true);
+        initSwitch('soundSwitch', true);
+        initSwitch('enterSwitch', true);
+        initSwitch('bigEmojiSwitch', true);
+        
+        modal.querySelector('#saveAllSettingsBtn').onclick = async () => {
             currentUser.name = modal.querySelector('#settingsName').value;
             currentUser.username = modal.querySelector('#settingsUsername').value;
             currentUser.email = modal.querySelector('#settingsEmail').value;
@@ -1104,6 +1249,38 @@
             modal.remove();
             renderMessenger();
         };
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    async function showPrivacyModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Конфиденциальность</h3><button class="close-modal">&times;</button></div><div class="modal-body">
+            <div class="settings-section"><div class="settings-section-title">Кто видит мой email</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-envelope"></i> Email</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option>Никто</option></select></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-user"></i> Фотография профиля</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option selected>Никто</option></select></div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-info-circle"></i> О себе</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option><option>Никто</option></select></div>
+            </div>
+            <div class="settings-section"><div class="settings-section-title">Кто может писать мне</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-comment"></i> Сообщения</div><select style="padding:8px;border-radius:12px;"><option>Все</option><option>Мои контакты</option></select></div>
+            </div>
+            <div class="settings-section"><div class="settings-section-title">Заблокированные пользователи</div>
+                <div class="settings-item"><div class="settings-item-left"><i class="fas fa-ban"></i> Заблокированные</div><span>Нет</span></div>
+            </div>
+        </div></div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    async function showSessionsModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Активные сеансы</h3><button class="close-modal">&times;</button></div><div class="modal-body">
+            <div class="settings-item" style="background:var(--bg-chat);border-radius:12px;"><div class="settings-item-left"><i class="fas fa-desktop"></i><div><strong>Это устройство</strong><br><small>BWMessenger Web • Сейчас</small></div></div><span style="color:var(--online-green);">● Этот сеанс</span></div>
+            <button id="terminateOthersBtn" style="margin-top:16px;width:100%;padding:10px;background:#ef4444;color:white;border:none;border-radius:12px;">Завершить все другие сеансы</button>
+        </div></div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#terminateOthersBtn').onclick = () => showToast('Все другие сеансы завершены');
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
