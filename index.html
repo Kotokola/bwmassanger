@@ -68,8 +68,14 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        @keyframes ring {
+            0% { transform: rotate(0); }
+            25% { transform: rotate(10deg); }
+            50% { transform: rotate(-10deg); }
+            75% { transform: rotate(5deg); }
+            100% { transform: rotate(0); }
+        }
 
-        /* Модальное окно */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -117,7 +123,6 @@
         }
         .close-modal:hover { color: var(--text-primary); }
 
-        /* Контекстное меню */
         .context-menu {
             position: fixed;
             background: var(--bg-sidebar);
@@ -146,7 +151,6 @@
             margin: 6px 0;
         }
 
-        /* Боковое меню (drawer) */
         .drawer {
             position: fixed;
             top: 0;
@@ -197,7 +201,6 @@
         }
         .overlay.show { display: block; }
 
-        /* Авторизация */
         .auth-wrapper {
             display: flex;
             justify-content: center;
@@ -277,14 +280,12 @@
             margin-bottom: 12px;
         }
 
-        /* Основной интерфейс */
         .messenger-layout {
             display: flex;
             height: 100vh;
             width: 100%;
         }
 
-        /* Боковая панель */
         .sidebar-panel {
             width: 360px;
             background: var(--bg-sidebar);
@@ -297,7 +298,7 @@
             padding: 16px 20px;
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 12px;
             border-bottom: 1px solid var(--border-light);
         }
         .user-avatar-small {
@@ -307,19 +308,6 @@
             object-fit: cover;
             cursor: pointer;
         }
-        .header-actions { display: flex; gap: 12px; }
-        .icon-btn {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 8px;
-            border-radius: 50%;
-            transition: 0.2s;
-        }
-        .icon-btn:hover { background: var(--bg-chat); color: var(--text-primary); }
-        
         .search-container {
             padding: 12px 16px;
             position: relative;
@@ -417,10 +405,12 @@
             font-size: 13px;
             cursor: pointer;
             border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .archive-header:hover { background: var(--bg-chat); }
 
-        /* Область чата */
         .chat-container {
             flex: 1;
             display: flex;
@@ -534,6 +524,15 @@
             color: white;
             animation: pulse 1s infinite;
         }
+        .call-button {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            color: white;
+        }
         .no-chat-placeholder {
             display: flex;
             align-items: center;
@@ -557,6 +556,20 @@
             animation: slideIn 0.3s ease;
             white-space: nowrap;
         }
+        .incoming-call {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--accent);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 50px;
+            display: flex;
+            gap: 20px;
+            z-index: 2500;
+            animation: slideIn 0.3s ease;
+        }
 
         .group-user-select {
             display: flex;
@@ -566,7 +579,6 @@
             cursor: pointer;
             border-bottom: 1px solid var(--border-light);
         }
-        .group-user-select.selected { background: var(--bg-chat); }
         .group-user-select-checkbox {
             width: 20px;
             height: 20px;
@@ -615,15 +627,15 @@
     emailjs.init("ozNh-mba3XbBgyuIw");
 
     const DB_NAME = 'BWMessengerDB';
-    const DB_VERSION = 16;
+    const DB_VERSION = 17;
     let db = null;
     let currentUser = null;
     let currentChat = null;
     let allChats = [];
-    let archivedChats = [];
     let showArchived = false;
     let mediaRecorder = null;
     let audioChunks = [];
+    let activeCall = null;
 
     function openDB() {
         return new Promise((resolve, reject) => {
@@ -793,6 +805,24 @@
         }
     }
 
+    async function startCall(chatId, isVideo = false) {
+        const chat = allChats.find(c => c.id === chatId);
+        if (!chat) return;
+        let targetName = '';
+        if (chat.type === 'private') {
+            const otherId = chat.participants.find(id => id !== currentUser.id);
+            const users = await getUsers();
+            const other = users.find(u => u.id === otherId);
+            targetName = other ? `${other.name}` : 'собеседником';
+        } else {
+            targetName = chat.name;
+        }
+        showToast(`📞 Вызов ${targetName}... (демо-режим)`);
+        setTimeout(() => {
+            showToast(`🔴 Вызов завершён`);
+        }, 5000);
+    }
+
     const root = document.getElementById('root');
 
     async function init() {
@@ -940,7 +970,8 @@
                 id: Date.now().toString(),
                 name: data.name, lastname: data.lastname, username: data.username,
                 email: data.email, password: data.password, avatar: data.avatar || null,
-                about: '', online: true, createdAt: Date.now(), blocked: []
+                about: '', online: true, createdAt: Date.now(), blocked: [],
+                privacy: { email: 'all', photo: 'all', about: 'all', messages: 'all' }
             };
             await saveUser(newUser);
             await deleteTempCode(window.pendingEmail);
@@ -978,7 +1009,7 @@
 
     async function renderMessenger() {
         allChats = await getAllChats();
-        archivedChats = allChats.filter(c => c.archived);
+        const archivedChats = allChats.filter(c => c.archived);
         
         if(!allChats.find(c => c.type === 'saved' && c.userId === currentUser.id)) {
             await saveChat({ id: `saved_${currentUser.id}`, type: 'saved', userId: currentUser.id, name: 'Избранное' });
@@ -999,7 +1030,7 @@
                 <div class="drawer-item" id="drawerContacts"><i class="fas fa-address-book"></i> Контакты</div>
                 <div class="drawer-item" id="drawerCalls"><i class="fas fa-phone"></i> Звонки</div>
                 <div class="drawer-item" id="drawerSaved"><i class="fas fa-bookmark"></i> Избранное</div>
-                <div class="drawer-item" id="drawerArchiveSettings"><i class="fas fa-archive"></i> Архив</div>
+                <div class="drawer-item" id="drawerArchive"><i class="fas fa-archive"></i> Архив</div>
                 <div class="drawer-item" id="drawerSettings"><i class="fas fa-sliders-h"></i> Настройки</div>
                 <div class="drawer-item" id="drawerPrivacy"><i class="fas fa-lock"></i> Конфиденциальность</div>
                 <div class="drawer-item" id="drawerSessions"><i class="fas fa-laptop"></i> Активные сеансы</div>
@@ -1010,9 +1041,6 @@
                 <div class="sidebar-panel" id="sidebarPanel">
                     <div class="sidebar-header">
                         <img class="user-avatar-small" src="${currentUser.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${currentUser.name}`}" id="openDrawerBtn">
-                        <div class="header-actions">
-                            <button class="icon-btn" id="moreMenuBtn"><i class="fas fa-ellipsis-h"></i></button>
-                        </div>
                     </div>
                     <div class="search-container">
                         <input type="text" id="searchUsersInput" class="search-input" placeholder="🔍 Поиск пользователей или @username">
@@ -1046,15 +1074,14 @@
         
         document.getElementById('drawerProfile').onclick = () => { showProfileModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerContacts').onclick = () => { showContactsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
-        document.getElementById('drawerCalls').onclick = () => { showToast('Звонки будут доступны в следующей версии'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
+        document.getElementById('drawerCalls').onclick = () => { showCallsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerSaved').onclick = async () => { 
             const savedChat = allChats.find(c => c.type === 'saved' && c.userId === currentUser.id);
             if(savedChat) await openChat(savedChat.id);
             drawer.classList.remove('open'); overlay.classList.remove('show');
         };
-        document.getElementById('drawerArchiveSettings').onclick = () => {
-            const hideArchived = confirm('Скрыть архив из списка чатов?');
-            localStorage.setItem('hideArchived', hideArchived);
+        document.getElementById('drawerArchive').onclick = () => {
+            showArchived = !showArchived;
             renderChatsList();
             drawer.classList.remove('open'); overlay.classList.remove('show');
         };
@@ -1063,22 +1090,6 @@
         document.getElementById('drawerSessions').onclick = () => { showSessionsModal(); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerNightMode').onclick = () => { document.body.classList.toggle('dark'); drawer.classList.remove('open'); overlay.classList.remove('show'); };
         document.getElementById('drawerLogout').onclick = async () => { await clearSession(); location.reload(); };
-        
-        document.getElementById('moreMenuBtn').onclick = () => {
-            const menu = document.createElement('div');
-            menu.className = 'context-menu';
-            menu.style.left = 'auto';
-            menu.style.right = '10px';
-            menu.style.top = '60px';
-            menu.innerHTML = `<div class="context-menu-item" id="createGroupMenuItem"><i class="fas fa-users"></i> Создать группу</div>
-                              <div class="context-menu-item" id="createChannelMenuItem"><i class="fas fa-bullhorn"></i> Создать канал</div>
-                              <div class="context-menu-item" id="archiveMenuToggle"><i class="fas fa-archive"></i> ${showArchived ? 'Скрыть архив' : 'Показать архив'}</div>`;
-            document.body.appendChild(menu);
-            document.getElementById('createGroupMenuItem').onclick = () => { createGroupWizard(); menu.remove(); };
-            document.getElementById('createChannelMenuItem').onclick = () => { showToast('Создание канала в разработке'); menu.remove(); };
-            document.getElementById('archiveMenuToggle').onclick = () => { showArchived = !showArchived; renderChatsList(); menu.remove(); };
-            setTimeout(() => menu.remove(), 5000);
-        };
         
         document.getElementById('archiveHeaderBtn').onclick = () => { showArchived = !showArchived; renderChatsList(); };
 
@@ -1196,80 +1207,13 @@
         };
     }
 
-    async function createGroupWizard() {
-        const groupName = prompt('Введите название группы');
-        if (!groupName) return;
-        
-        const users = await getUsers();
-        const contacts = users.filter(u => u.id !== currentUser.id);
-        
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-        modal.innerHTML = `
-            <div class="modal-container">
-                <div class="modal-header"><h3>Добавить участников</h3><button class="close-modal">&times;</button></div>
-                <div class="modal-body">
-                    <div class="search-container" style="padding:0 0 12px 0;">
-                        <input type="text" id="groupUserSearch" class="search-input" placeholder="🔍 Поиск по username или имени">
-                    </div>
-                    <div id="groupUsersList"></div>
-                    <button id="createGroupFinalBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Создать группу</button>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(modal);
-        
-        let selectedUsers = [];
-        
-        const renderUserList = (filter = '') => {
-            const filtered = contacts.filter(c => 
-                c.username.toLowerCase().includes(filter.toLowerCase()) ||
-                c.name.toLowerCase().includes(filter.toLowerCase())
-            );
-            const container = document.getElementById('groupUsersList');
-            container.innerHTML = filtered.map(u => `
-                <div class="group-user-select" data-user-id="${u.id}">
-                    <div class="group-user-select-checkbox ${selectedUsers.includes(u.id) ? 'selected' : ''}"></div>
-                    <img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;">
-                    <div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div>
-                </div>
-            `).join('');
-            document.querySelectorAll('.group-user-select').forEach(el => {
-                el.onclick = () => {
-                    const userId = el.dataset.userId;
-                    if (selectedUsers.includes(userId)) {
-                        selectedUsers = selectedUsers.filter(id => id !== userId);
-                    } else {
-                        selectedUsers.push(userId);
-                    }
-                    renderUserList(document.getElementById('groupUserSearch').value);
-                };
-            });
-        };
-        
-        renderUserList();
-        document.getElementById('groupUserSearch').oninput = (e) => renderUserList(e.target.value);
-        
-        document.getElementById('createGroupFinalBtn').onclick = async () => {
-            const participants = [currentUser.id, ...selectedUsers];
-            const chat = { id: `group_${Date.now()}`, type: 'group', name: groupName, participants: participants, createdAt: Date.now() };
-            await saveChat(chat);
-            allChats.push(chat);
-            await renderChatsList();
-            showToast(`Группа "${groupName}" создана`);
-            modal.remove();
-        };
-        modal.querySelector('.close-modal').onclick = () => modal.remove();
-    }
-
     async function renderChatsList() {
         const container = document.getElementById('chatsListContainer');
         if(!container) return;
         const users = await getUsers();
         const myId = currentUser.id;
-        const hideArchived = localStorage.getItem('hideArchived') === 'true';
         let myChats = allChats.filter(c => {
-            if (c.archived && (hideArchived || !showArchived)) return false;
+            if (c.archived && !showArchived) return false;
             if (c.type === 'private') return c.participants?.includes(myId);
             if (c.type === 'saved') return c.userId === myId;
             if (c.type === 'group') return c.participants?.includes(myId);
@@ -1285,10 +1229,15 @@
                 const other = users.find(u => u.id === otherId);
                 displayName = other ? `${other.name} ${other.lastname || ''}` : 'Unknown';
                 isOnline = other?.online || false;
-                avatarHtml = other?.avatar ? `<img class="chat-avatar" src="${other.avatar}">` : `<div class="chat-avatar">${displayName.charAt(0).toUpperCase()}</div>`;
+                const canSeeAvatar = !other?.privacy?.photo || other.privacy.photo === 'all' || (other.privacy.photo === 'contacts' && true);
+                if (other?.avatar && canSeeAvatar) {
+                    avatarHtml = `<img class="chat-avatar" src="${other.avatar}">`;
+                } else {
+                    avatarHtml = `<div class="chat-avatar">${displayName.charAt(0).toUpperCase()}</div>`;
+                }
             } else if(chat.type === 'saved') { displayName = '⭐ Избранное'; avatarHtml = '<div class="chat-avatar">⭐</div>'; }
             else { avatarHtml = `<div class="chat-avatar">${chat.name.charAt(0).toUpperCase()}</div>`; }
-            return `<div class="chat-row" data-chat-id="${chat.id}" data-chat-type="${chat.type}">
+            return `<div class="chat-row ${chat.archived ? 'archived' : ''}" data-chat-id="${chat.id}" data-chat-type="${chat.type}">
                         <div class="chat-avatar-wrapper">${avatarHtml}${isOnline ? '<div class="online-badge"></div>' : ''}</div>
                         <div class="chat-info">
                             <div class="chat-name">${escapeHtml(displayName)}</div>
@@ -1357,15 +1306,28 @@
         await updateDeliveryStatus(chatId);
         const users = await getUsers();
         let headerText = '', headerAvatar = '';
+        let otherUser = null;
         if(currentChat.type === 'private') {
             const otherId = currentChat.participants.find(id => id !== currentUser.id);
-            const other = users.find(u => u.id === otherId);
-            headerText = other ? `${other.name} ${other.lastname || ''}` : 'Чат';
-            headerAvatar = other?.avatar ? `<img class="chat-avatar" style="width:44px;height:44px;" src="${other.avatar}">` : `<div class="chat-avatar" style="width:44px;height:44px;">${headerText.charAt(0).toUpperCase()}</div>`;
+            otherUser = users.find(u => u.id === otherId);
+            headerText = otherUser ? `${otherUser.name} ${otherUser.lastname || ''}` : 'Чат';
+            const canSeeAvatar = !otherUser?.privacy?.photo || otherUser.privacy.photo === 'all' || (otherUser.privacy.photo === 'contacts' && true);
+            if (otherUser?.avatar && canSeeAvatar) {
+                headerAvatar = `<img class="chat-avatar" style="width:44px;height:44px;" src="${otherUser.avatar}">`;
+            } else {
+                headerAvatar = `<div class="chat-avatar" style="width:44px;height:44px;">${headerText.charAt(0).toUpperCase()}</div>`;
+            }
         } else if(currentChat.type === 'saved') { headerText = '⭐ Избранное'; headerAvatar = '<div class="chat-avatar" style="width:44px;height:44px;">⭐</div>'; }
         else { headerText = currentChat.name; headerAvatar = `<div class="chat-avatar" style="width:44px;height:44px;">${headerText.charAt(0).toUpperCase()}</div>`; }
-        document.getElementById('chatHeaderArea').innerHTML = `<i class="fas fa-bars" id="mobileMenuToggle2" style="display:${window.innerWidth<=768?'block':'none'};font-size:24px;cursor:pointer;"></i>${headerAvatar}<div><strong>${escapeHtml(headerText)}</strong><br><span style="font-size:12px;color:var(--text-secondary)">в сети</span></div>`;
+        
+        document.getElementById('chatHeaderArea').innerHTML = `<i class="fas fa-bars" id="mobileMenuToggle2" style="display:${window.innerWidth<=768?'block':'none'};font-size:24px;cursor:pointer;"></i>${headerAvatar}<div><strong>${escapeHtml(headerText)}</strong><br><span style="font-size:12px;color:var(--text-secondary)">в сети</span></div>
+            <div style="margin-left:auto;display:flex;gap:8px;">
+                <button class="call-button" id="audioCallBtn"><i class="fas fa-phone"></i></button>
+                <button class="call-button" id="videoCallBtn"><i class="fas fa-video"></i></button>
+            </div>`;
         if(window.innerWidth<=768) document.getElementById('mobileMenuToggle2').onclick = () => document.getElementById('sidebarPanel').classList.toggle('mobile-open');
+        document.getElementById('audioCallBtn').onclick = () => startCall(currentChat.id, false);
+        document.getElementById('videoCallBtn').onclick = () => startCall(currentChat.id, true);
         await loadMessages();
         document.querySelectorAll('.chat-row').forEach(el => el.classList.remove('active'));
         const activeEl = document.querySelector(`.chat-row[data-chat-id="${chatId}"]`);
@@ -1526,10 +1488,20 @@
     async function showPrivacyModal() {
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Конфиденциальность</h3><button class="close-modal">&times;</button></div><div class="modal-body"><div class="settings-group"><div class="settings-group-title">Кто видит мой email</div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-envelope"></i> Email</div><select id="privacyEmail" class="settings-select"><option value="all">Все</option><option value="contacts">Мои контакты</option><option value="nobody">Никто</option></select></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-user"></i> Фотография профиля</div><select id="privacyPhoto" class="settings-select"><option value="all">Все</option><option value="contacts">Мои контакты</option><option value="nobody">Никто</option></select></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-info-circle"></i> О себе</div><select id="privacyAbout" class="settings-select"><option value="all">Все</option><option value="contacts">Мои контакты</option><option value="nobody">Никто</option></select></div></div><div class="settings-group"><div class="settings-group-title">Кто может писать мне</div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-comment"></i> Сообщения</div><select id="privacyMessages" class="settings-select"><option value="all">Все</option><option value="contacts">Мои контакты</option></select></div></div><div class="settings-group"><div class="settings-group-title">Заблокированные пользователи</div><div class="settings-row" id="blockedUsersList"><div class="settings-row-left"><i class="fas fa-ban"></i> Заблокированные</div><span>Нет заблокированных</span></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-plus"></i> Добавить пользователя</div><input type="text" id="blockUsername" placeholder="@username" style="width:120px;padding:6px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);"><button id="blockUserBtn" style="padding:6px 12px;background:var(--danger);color:white;border:none;border-radius:8px;">Заблокировать</button></div></div><button id="savePrivacyBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить настройки</button></div></div>`;
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Конфиденциальность</h3><button class="close-modal">&times;</button></div><div class="modal-body"><div class="settings-group"><div class="settings-group-title">Кто видит мой email</div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-envelope"></i> Email</div><select id="privacyEmail" class="settings-select"><option value="all" ${currentUser.privacy?.email === 'all' ? 'selected' : ''}>Все</option><option value="contacts" ${currentUser.privacy?.email === 'contacts' ? 'selected' : ''}>Мои контакты</option><option value="nobody" ${currentUser.privacy?.email === 'nobody' ? 'selected' : ''}>Никто</option></select></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-user"></i> Фотография профиля</div><select id="privacyPhoto" class="settings-select"><option value="all" ${currentUser.privacy?.photo === 'all' ? 'selected' : ''}>Все</option><option value="contacts" ${currentUser.privacy?.photo === 'contacts' ? 'selected' : ''}>Мои контакты</option><option value="nobody" ${currentUser.privacy?.photo === 'nobody' ? 'selected' : ''}>Никто</option></select></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-info-circle"></i> О себе</div><select id="privacyAbout" class="settings-select"><option value="all" ${currentUser.privacy?.about === 'all' ? 'selected' : ''}>Все</option><option value="contacts" ${currentUser.privacy?.about === 'contacts' ? 'selected' : ''}>Мои контакты</option><option value="nobody" ${currentUser.privacy?.about === 'nobody' ? 'selected' : ''}>Никто</option></select></div></div><div class="settings-group"><div class="settings-group-title">Кто может писать мне</div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-comment"></i> Сообщения</div><select id="privacyMessages" class="settings-select"><option value="all" ${currentUser.privacy?.messages === 'all' ? 'selected' : ''}>Все</option><option value="contacts" ${currentUser.privacy?.messages === 'contacts' ? 'selected' : ''}>Мои контакты</option></select></div></div><div class="settings-group"><div class="settings-group-title">Заблокированные пользователи</div><div class="settings-row" id="blockedUsersList"><div class="settings-row-left"><i class="fas fa-ban"></i> Заблокированные</div><span>${currentUser.blocked?.length || 0} пользователей</span></div><div class="settings-row"><div class="settings-row-left"><i class="fas fa-plus"></i> Добавить пользователя</div><input type="text" id="blockUsername" placeholder="@username" style="width:120px;padding:6px;border-radius:8px;border:1px solid var(--border-light);background:var(--bg-chat);"><button id="blockUserBtn" style="padding:6px 12px;background:var(--danger);color:white;border:none;border-radius:8px;">Заблокировать</button></div></div><button id="savePrivacyBtn" style="margin-top:20px;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:12px;">Сохранить настройки</button></div></div>`;
         document.body.appendChild(modal);
         document.getElementById('blockUserBtn').onclick = async () => { const username = document.getElementById('blockUsername').value.trim().replace('@', ''); if(username) { const user = await getUserByUsername(username); if(user && user.id !== currentUser.id) { if(!currentUser.blocked) currentUser.blocked = []; if(!currentUser.blocked.includes(user.id)) { currentUser.blocked.push(user.id); await saveUser(currentUser); showToast(`Пользователь @${username} заблокирован`); document.getElementById('blockUsername').value = ''; } else { showToast('Пользователь уже в чёрном списке', true); } } else { showToast('Пользователь не найден', true); } } };
-        document.getElementById('savePrivacyBtn').onclick = async () => { showToast('Настройки конфиденциальности сохранены'); modal.remove(); };
+        document.getElementById('savePrivacyBtn').onclick = async () => {
+            if (!currentUser.privacy) currentUser.privacy = {};
+            currentUser.privacy.email = document.getElementById('privacyEmail').value;
+            currentUser.privacy.photo = document.getElementById('privacyPhoto').value;
+            currentUser.privacy.about = document.getElementById('privacyAbout').value;
+            currentUser.privacy.messages = document.getElementById('privacyMessages').value;
+            await saveUser(currentUser);
+            showToast('Настройки конфиденциальности сохранены');
+            modal.remove();
+            renderMessenger();
+        };
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
@@ -1552,6 +1524,14 @@
         modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Контакты</h3><button class="close-modal">&times;</button></div><div class="modal-body">${contacts.map(u => `<div class="settings-row" data-username="${u.username}" style="cursor:pointer;"><div class="settings-row-left"><img src="${u.avatar || `https://ui-avatars.com/api/?background=4f46e5&color=fff&name=${u.name}`}" style="width:40px;height:40px;border-radius:50%;"><div><strong>${escapeHtml(u.name)} ${escapeHtml(u.lastname || '')}</strong><br><small>@${escapeHtml(u.username)}</small></div></div><i class="fas fa-comment" style="color:var(--accent);"></i></div>`).join('')}</div></div>`;
         document.body.appendChild(modal);
         modal.querySelectorAll('.settings-row').forEach(el => { el.onclick = async () => { const target = await getUserByUsername(el.dataset.username); if(target) { let chat = allChats.find(c => c.type === 'private' && c.participants?.includes(currentUser.id) && c.participants?.includes(target.id)); if(!chat) { chat = { id: `private_${Date.now()}`, type: 'private', participants: [currentUser.id, target.id], name: `${target.name} ${target.lastname || ''}` }; await saveChat(chat); allChats.push(chat); await renderChatsList(); } await openChat(chat.id); modal.remove(); } }; });
+        modal.querySelector('.close-modal').onclick = () => modal.remove();
+    }
+
+    async function showCallsModal() {
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `<div class="modal-container"><div class="modal-header"><h3>Звонки</h3><button class="close-modal">&times;</button></div><div class="modal-body"><div class="no-chat-placeholder"><i class="fas fa-phone-slash" style="font-size:48px;opacity:0.3;"></i><p>История звонков пуста</p><p style="font-size:12px;">Нажмите на иконку телефона в чате, чтобы совершить звонок</p></div></div></div>`;
+        document.body.appendChild(modal);
         modal.querySelector('.close-modal').onclick = () => modal.remove();
     }
 
