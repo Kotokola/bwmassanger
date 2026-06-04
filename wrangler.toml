@@ -1,0 +1,16 @@
+name = "bwmessenger"
+
+main = "worker/src/index.js"
+
+compatibility_date = "2025-07-01"
+
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bwmessenger"
+database_id = "497d4c1f-135f-4020-897e-adf97ad2f7a7"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "17bcf64d55164a05965074b5013d2d50"
